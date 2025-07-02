@@ -1,0 +1,26 @@
+{
+  "name": "@n8n/mcp",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "tsup --tsconfig tsconfig.build.json",
+    "dev": "tsup --watch --tsconfig tsconfig.build.json"
+  },
+  "dependencies": {
+    "@langchain/core": "catalog:",
+    "langchain": "catalog:",
+    "@modelcontextprotocol/sdk": "catalog:",
+    "n8n-workflow": "workspace:*",
+    "zod": "catalog:",
+    "zod-to-json-schema": "catalog:",
+    "@n8n/json-schema-to-zod": "workspace:*"
+  },
+  "devDependencies": {
+    "@n8n/typescript-config": "workspace:*",
+    "tsup": "catalog:",
+    "rimraf": "catalog:"
+  }
+}
