@@ -94,16 +94,53 @@ export class McpTrigger extends Node {
 				default: 'none',
 				description: 'The way to authenticate',
 			},
-			{
-				displayName: 'Path',
-				name: 'path',
-				type: 'string',
-				default: '',
-				placeholder: 'webhook',
-				required: true,
-				description: 'The base path for this MCP server',
-			},
-		],
+                        {
+                                displayName: 'Path',
+                                name: 'path',
+                                type: 'string',
+                                default: '',
+                                placeholder: 'webhook',
+                                required: true,
+                                description: 'The base path for this MCP server',
+                        },
+                       {
+                               displayName: 'Include Query Parameters',
+                               name: 'includeQueryParams',
+                               type: 'boolean',
+                               default: false,
+                               description: 'Include query parameters in tool calls',
+                       },
+                       {
+                               displayName: 'Additional Parameters',
+                               name: 'additionalParams',
+                               type: 'fixedCollection',
+                               default: {},
+                               placeholder: 'Add Parameter',
+                               typeOptions: { multipleValues: true },
+                               options: [
+                                       {
+                                               name: 'params',
+                                               displayName: 'Parameters',
+                                               values: [
+                                                       {
+                                                               displayName: 'Name',
+                                                               name: 'name',
+                                                               type: 'string',
+                                                               default: '',
+                                                               required: true,
+                                                       },
+                                                       {
+                                                               displayName: 'Value',
+                                                               name: 'value',
+                                                               type: 'string',
+                                                               default: '',
+                                                               required: true,
+                                                       },
+                                               ],
+                                       },
+                               ],
+                       },
+                ],
 		webhooks: [
 			{
 				name: 'setup',
@@ -153,9 +190,21 @@ export class McpTrigger extends Node {
 			}
 			throw error;
 		}
-		const node = context.getNode();
-		// Get a url/tool friendly name for the server, based on the node name
-		const serverName = node.typeVersion > 1 ? nodeNameToToolName(node) : 'n8n-mcp-server';
+               const node = context.getNode();
+               // Get a url/tool friendly name for the server, based on the node name
+               const serverName = node.typeVersion > 1 ? nodeNameToToolName(node) : 'n8n-mcp-server';
+
+               const includeQuery = context.getNodeParameter('includeQueryParams', 0, false) as boolean;
+               const additionalParams = (context.getNodeParameter('additionalParams.params', 0, []) as Array<{ name: string; value: string }>).reduce<Record<string, unknown>>(
+                       (acc, param) => {
+                               acc[param.name] = param.value;
+                               return acc;
+                       },
+                       {},
+               );
+               if (includeQuery) {
+                       Object.assign(additionalParams, req.query);
+               }
 
 		const mcpServerManager: McpServerManager = McpServerManager.instance(context.logger);
 
@@ -187,7 +236,12 @@ export class McpTrigger extends Node {
 
 				if (sessionId && mcpServerManager.getTransport(sessionId)) {
 					const connectedTools = await getConnectedTools(context, true);
-					const wasToolCall = await mcpServerManager.handlePostMessage(req, resp, connectedTools);
+                                       const wasToolCall = await mcpServerManager.handlePostMessage(
+                                               req,
+                                               resp,
+                                               connectedTools,
+                                               additionalParams,
+                                       );
 					if (wasToolCall) return { noWebhookResponse: true, workflowData: [[{ json: {} }]] };
 				} else {
 					// If no session is established, this is a setup request

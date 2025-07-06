@@ -90,12 +90,46 @@ describe('McpClientTool', () => {
 			expect(supplyDataResult.closeFunction).toBeInstanceOf(Function);
 			expect(supplyDataResult.response).toBeInstanceOf(McpToolkit);
 
-			const tools = (supplyDataResult.response as McpToolkit).getTools();
-			expect(tools).toHaveLength(2);
+                const tools = (supplyDataResult.response as McpToolkit).getTools();
+                expect(tools).toHaveLength(2);
 
-			const toolCallResult = await tools[0].invoke({ input: 'foo' });
-			expect(toolCallResult).toEqual(JSON.stringify([{ type: 'text', text: 'result from tool' }]));
-		});
+                const toolCallResult = await tools[0].invoke({ input: 'foo' });
+                expect(toolCallResult).toEqual(JSON.stringify([{ type: 'text', text: 'result from tool' }]));
+                });
+
+               it('should allow calling tools with additional arguments', async () => {
+                       jest.spyOn(Client.prototype, 'connect').mockResolvedValue();
+                       const callToolSpy = jest
+                               .spyOn(Client.prototype, 'callTool')
+                               .mockResolvedValue({ content: [] });
+                       jest.spyOn(Client.prototype, 'listTools').mockResolvedValue({
+                               tools: [
+                                       {
+                                               name: 'MyTool',
+                                               description: 'desc',
+                                               inputSchema: { type: 'object', properties: { input: { type: 'string' } } },
+                                       },
+                               ],
+                       });
+
+                       const supplyDataResult = await new McpClientTool().supplyData.call(
+                               mock<ISupplyDataFunctions>({
+                                       getNode: jest.fn(() => mock<INode>({ typeVersion: 1 })),
+                                       logger: { debug: jest.fn(), error: jest.fn() },
+                                       addInputData: jest.fn(() => ({ index: 0 })),
+                               }),
+                               0,
+                       );
+
+                       const tools = (supplyDataResult.response as McpToolkit).getTools();
+
+                       await tools[0].invoke({ input: 'foo', extra: 'bar' });
+
+                       expect(callToolSpy).toHaveBeenCalledWith(
+                               { name: 'MyTool', arguments: { input: 'foo', extra: 'bar' } },
+                               CompatibilityCallToolResultSchema,
+                       );
+               });
 
 		it('should support selecting tools to expose', async () => {
 			jest.spyOn(Client.prototype, 'connect').mockResolvedValue();

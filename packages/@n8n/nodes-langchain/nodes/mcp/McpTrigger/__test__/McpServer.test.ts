@@ -174,11 +174,11 @@ describe('McpServer', () => {
 			expect(mockResponse.flush).toHaveBeenCalledTimes(2);
 		});
 
-		it('should return 401 when transport does not exist', async () => {
-			// Set up request with rawBody and ensure sessionId is properly set
-			const testRequest = mock<Request>({
-				query: { sessionId: 'non-existent-session' },
-				path: '/sse',
+                it('should return 401 when transport does not exist', async () => {
+                        // Set up request with rawBody and ensure sessionId is properly set
+                        const testRequest = mock<Request>({
+                                query: { sessionId: 'non-existent-session' },
+                                path: '/sse',
 			});
 			testRequest.rawBody = Buffer.from(
 				JSON.stringify({
@@ -190,12 +190,70 @@ describe('McpServer', () => {
 			);
 
 			// Call without setting up transport for this sessionId
-			await mcpServerManager.handlePostMessage(testRequest, mockResponse, [mockTool]);
+                        await mcpServerManager.handlePostMessage(testRequest, mockResponse, [mockTool]);
 
 			// Verify error status was set
-			expect(mockResponse.status).toHaveBeenCalledWith(401);
-			expect(mockResponse.send).toHaveBeenCalledWith(expect.stringContaining('No transport found'));
-		});
+                        expect(mockResponse.status).toHaveBeenCalledWith(401);
+                        expect(mockResponse.send).toHaveBeenCalledWith(expect.stringContaining('No transport found'));
+                });
+
+               it('should merge injected parameters into tool call', async () => {
+                       mcpServerManager.transports[sessionId] = mockTransport;
+                       mockRequest.rawBody = Buffer.from(
+                               JSON.stringify({
+                                       jsonrpc: '2.0',
+                                       method: 'tools/call',
+                                       id: 123,
+                                       params: { name: 'mockTool', arguments: { input: 'foo' } },
+                               }),
+                       );
+
+                       const messageCaptor = captor<any>();
+
+                       await mcpServerManager.handlePostMessage(
+                               mockRequest,
+                               mockResponse,
+                               [mockTool],
+                               { chatbotId: '123' },
+                       );
+
+                       expect(mockTransport.handleRequest).toHaveBeenCalledWith(
+                               mockRequest,
+                               mockResponse,
+                               messageCaptor,
+                       );
+
+                       expect(messageCaptor.value.params.arguments).toEqual({ chatbotId: '123', input: 'foo' });
+               });
+
+               it('should merge query parameters when provided', async () => {
+                       mcpServerManager.transports[sessionId] = mockTransport;
+                       mockRequest.query = { sessionId, other: '1' } as any;
+                       mockRequest.rawBody = Buffer.from(
+                               JSON.stringify({
+                                       jsonrpc: '2.0',
+                                       method: 'tools/call',
+                                       id: 123,
+                                       params: { name: 'mockTool', arguments: { input: 'foo' } },
+                               }),
+                       );
+
+                       const cap = captor<any>();
+
+                       await mcpServerManager.handlePostMessage(
+                               mockRequest,
+                               mockResponse,
+                               [mockTool],
+                               { other: '1' },
+                       );
+
+                       expect(mockTransport.handleRequest).toHaveBeenCalledWith(
+                               mockRequest,
+                               mockResponse,
+                               cap,
+                       );
+                       expect(cap.value.params.arguments).toEqual({ other: '1', input: 'foo' });
+               });
 	});
 
 	describe('createServerWithStreamableHTTPTransport', () => {

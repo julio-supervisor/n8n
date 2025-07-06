@@ -184,7 +184,12 @@ export class McpServerManager {
 		}
 	}
 
-	async handlePostMessage(req: express.Request, resp: CompressionResponse, connectedTools: Tool[]) {
+       async handlePostMessage(
+               req: express.Request,
+               resp: CompressionResponse,
+               connectedTools: Tool[],
+               injectedParams: Record<string, unknown> = {},
+       ) {
 		// Session ID can be passed either as a query parameter (SSE transport)
 		// or in the header (StreamableHTTP transport).
 		const sessionId = this.getSessionId(req);
@@ -193,8 +198,20 @@ export class McpServerManager {
 			// We need to add a promise here because the `handlePostMessage` will send something to the
 			// MCP Server, that will run in a different context. This means that the return will happen
 			// almost immediately, and will lead to marking the sub-node as "running" in the final execution
-			const message = jsonParse(req.rawBody.toString());
-			const messageId = getRequestId(message);
+                       const message = jsonParse(req.rawBody.toString());
+                       if (
+                               message.params?.arguments &&
+                               typeof message.params.arguments === 'object'
+                       ) {
+                               message.params.arguments = {
+                                       ...injectedParams,
+                                       ...message.params.arguments,
+                               };
+                       } else if (Object.keys(injectedParams).length > 0) {
+                               if (!message.params) message.params = {} as any;
+                               message.params.arguments = { ...injectedParams };
+                       }
+                       const messageId = getRequestId(message);
 			// Use session & message ID if available, otherwise fall back to sessionId
 			const callId = messageId ? `${sessionId}_${messageId}` : sessionId;
 			this.tools[sessionId] = connectedTools;
@@ -253,12 +270,12 @@ export class McpServerManager {
 
 				return {
 					tools: this.tools[extra.sessionId].map((tool) => {
-						return {
-							name: tool.name,
-							description: tool.description,
-							// Allow additional properties on tool call input
-							inputSchema: zodToJsonSchema(tool.schema, { removeAdditionalStrategy: 'strict' }),
-						};
+                                               return {
+                                                        name: tool.name,
+                                                        description: tool.description,
+                                                        // Advertise tool schema without stripping additional properties
+                                                        inputSchema: zodToJsonSchema(tool.schema),
+                                                };
 					}),
 				};
 			},
