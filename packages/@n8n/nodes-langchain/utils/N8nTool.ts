@@ -55,9 +55,11 @@ export class N8nTool extends DynamicStructuredTool<ZodObjectAny> {
 	}
 
 	asDynamicTool(): DynamicTool {
-		const { name, func, schema, context, description } = this;
+        const { name, func, schema, context, description } = this;
 
-		const parser = new StructuredOutputParser(schema);
+        const passthroughSchema = schema.passthrough();
+
+        const parser = new StructuredOutputParser(passthroughSchema);
 
 		const wrappedFunc = async function (query: string) {
 			let parsedQuery: object;
@@ -89,7 +91,7 @@ export class N8nTool extends DynamicStructuredTool<ZodObjectAny> {
 
 				// If we were able to parse the query with a fallback, we try to validate it using the schema
 				// Here we will throw an error if the data still does not match the schema
-				parsedQuery = schema.parse(dataFromModel);
+                                parsedQuery = passthroughSchema.parse(dataFromModel);
 			}
 
 			try {

@@ -147,8 +147,8 @@ describe('Test N8nTool wrapper - DynamicTool fallback', () => {
 		expect(func).toHaveBeenCalledWith({ foo: testParameter });
 	});
 
-	it('should recover when JS object is passed instead of JSON', async () => {
-		const func = jest.fn();
+        it('should recover when JS object is passed instead of JSON', async () => {
+                const func = jest.fn();
 
 		const ctx = createMockExecuteFunction<ISupplyDataFunctions>({}, mockNode);
 
@@ -163,8 +163,29 @@ describe('Test N8nTool wrapper - DynamicTool fallback', () => {
 
 		const dynamicTool = tool.asDynamicTool();
 
-		await dynamicTool.func('{ foo: "some value" }');
+                await dynamicTool.func('{ foo: "some value" }');
 
-		expect(func).toHaveBeenCalledWith({ foo: 'some value' });
-	});
+                expect(func).toHaveBeenCalledWith({ foo: 'some value' });
+        });
+
+        it('should preserve additional parameters when provided', async () => {
+                const func = jest.fn();
+
+                const ctx = createMockExecuteFunction<ISupplyDataFunctions>({}, mockNode);
+
+                const tool = new N8nTool(ctx, {
+                        name: 'Dummy Tool',
+                        description: 'A dummy tool for testing',
+                        func,
+                        schema: z.object({
+                                foo: z.string().describe('Foo description'),
+                        }),
+                });
+
+                const dynamicTool = tool.asDynamicTool();
+
+                await dynamicTool.func(JSON.stringify({ foo: 'some value', extra: '1' }));
+
+                expect(func).toHaveBeenCalledWith({ foo: 'some value', extra: '1' });
+        });
 });
