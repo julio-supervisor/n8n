@@ -306,7 +306,7 @@ describe('McpClientTool', () => {
                                         getNode: jest.fn(() => mock<INode>({ typeVersion: 1 })),
                                         getNodeParameter: jest.fn((key) => {
                                                 const parameters: Record<string, any> = {
-                                                        additionalArgs: { arg: [{ key: 'tenant', value: 'foo' }] },
+                                                        'additionalArgs.arg': [{ key: 'tenant', value: 'foo' }],
                                                 };
                                                 return parameters[key];
                                         }),

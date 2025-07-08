@@ -240,11 +240,11 @@ export class McpClientTool implements INodeType {
                 const mode = this.getNodeParameter('include', itemIndex) as McpToolIncludeMode;
                 const includeTools = this.getNodeParameter('includeTools', itemIndex, []) as string[];
                 const excludeTools = this.getNodeParameter('excludeTools', itemIndex, []) as string[];
-                const extraPairs = this.getNodeParameter('additionalArgs', itemIndex, []) as Array<{ key: string; value: string }>;
-
-                if (extraPairs.length > 10) {
-                        return setError('Maximum 10 arguments');
-                }
+                const extraPairs = this.getNodeParameter(
+                        'additionalArgs.arg',
+                        itemIndex,
+                        [],
+                ) as Array<{ key: string; value: string }>;
 
                 const additionalArgs = extraPairs.reduce<IDataObject>((acc, { key, value }) => {
                         if (key) acc[key] = value;
