@@ -12,7 +12,7 @@
 			"cache": false
 		},
 		"build:playwright": {
-			"dependsOn": ["install-browsers", "build"]
+			"dependsOn": ["install-browsers:ci", "build"]
 		},
 		"build:backend": {
 			"dependsOn": ["n8n#build"]
@@ -143,11 +143,19 @@
 			"cache": false,
 			"persistent": true
 		},
-		"install-browsers": {
+		"install-browsers:ci": {
 			"cache": true,
 			"inputs": ["package.json"],
 			"outputs": ["ms-playwright-cache/**"],
 			"env": ["PLAYWRIGHT_BROWSERS_PATH"]
+		},
+		"install-browsers:local": {
+			"cache": false,
+			"inputs": ["package.json"]
+		},
+		"test:standard": {
+			"dependsOn": ["install-browsers:local"],
+			"cache": false
 		}
 	}
 }

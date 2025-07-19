@@ -7,7 +7,7 @@ import {
 	type SupplyData,
 } from 'n8n-workflow';
 
-import { getHttpProxyAgent } from '@utils/httpProxyAgent';
+import { getProxyAgent } from '@utils/httpProxyAgent';
 import { getConnectionHintNoticeField } from '@utils/sharedFields';
 
 import { makeN8nLlmFailedAttemptHandler } from '../n8nLlmFailedAttemptHandler';
@@ -60,6 +60,7 @@ export class LmChatAwsBedrock implements INodeType {
 				displayName: 'Model',
 				name: 'model',
 				type: 'options',
+				allowArbitraryValues: true, // Hide issues when model name is specified in the expression and does not match any of the options
 				description:
 					'The model which will generate the completion. <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/foundation-models.html">Learn more</a>.',
 				typeOptions: {
@@ -147,7 +148,7 @@ export class LmChatAwsBedrock implements INodeType {
 			temperature: options.temperature,
 			maxTokens: options.maxTokensToSample,
 			clientConfig: {
-				httpAgent: getHttpProxyAgent(),
+				httpAgent: getProxyAgent(),
 			},
 			credentials: {
 				secretAccessKey: credentials.secretAccessKey as string,

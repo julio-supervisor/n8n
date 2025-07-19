@@ -1,6 +1,9 @@
-/* eslint-disable import/no-default-export */
+/* eslint-disable import-x/no-default-export */
+import { currentsReporter } from '@currents/playwright';
 import type { Project } from '@playwright/test';
 import { defineConfig } from '@playwright/test';
+
+import currentsConfig from './currents.config';
 
 /*
  * Mode-based Test Configuration
@@ -105,6 +108,7 @@ export default defineConfig({
 				['html', { open: 'never' }],
 				['json', { outputFile: 'test-results.json' }],
 				['blob'],
+				currentsReporter(currentsConfig),
 			]
 		: [['html']],
 
@@ -117,6 +121,7 @@ export default defineConfig({
 		viewport: { width: 1536, height: 960 },
 		actionTimeout: 10000,
 		navigationTimeout: 10000,
+		channel: 'chromium',
 	},
 
 	projects: process.env.N8N_BASE_URL
