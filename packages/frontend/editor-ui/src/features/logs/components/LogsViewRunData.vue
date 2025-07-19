@@ -11,10 +11,15 @@ import { I18nT } from 'vue-i18n';
 import { PiPWindowSymbol } from '@/constants';
 import { isSubNodeLog } from '../logs.utils';
 
-const { title, logEntry, paneType } = defineProps<{
+const { title, logEntry, paneType, collapsingTableColumnName } = defineProps<{
 	title: string;
 	paneType: NodePanelType;
 	logEntry: LogEntry;
+	collapsingTableColumnName: string | null;
+}>();
+
+const emit = defineEmits<{
+	collapsingTableColumnChanged: [columnName: string | null];
 }>();
 
 const locale = useI18n();
@@ -85,7 +90,9 @@ function handleChangeDisplayMode(value: IRunDataDisplayMode) {
 		:disable-ai-content="!isSubNodeLog(logEntry)"
 		:is-executing="isExecuting"
 		table-header-bg-color="light"
+		:collapsing-table-column-name="collapsingTableColumnName"
 		@display-mode-change="handleChangeDisplayMode"
+		@collapsing-table-column-changed="emit('collapsingTableColumnChanged', $event)"
 	>
 		<template #header>
 			<N8nText :class="$style.title" :bold="true" color="text-light" size="small">
@@ -111,7 +118,7 @@ function handleChangeDisplayMode(value: IRunDataDisplayMode) {
 		</template>
 
 		<template v-if="isMultipleInput" #callout-message>
-			<I18nT keypath="logs.details.body.multipleInputs">
+			<I18nT keypath="logs.details.body.multipleInputs" scope="global">
 				<template #button>
 					<N8nLink size="small" @click="handleClickOpenNdv">
 						{{ locale.baseText('logs.details.body.multipleInputs.openingTheNode') }}

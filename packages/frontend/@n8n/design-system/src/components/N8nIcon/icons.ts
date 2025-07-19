@@ -1,4 +1,5 @@
 import Binary from './custom/binary.svg';
+import BoltFilled from './custom/bolt-filled.svg';
 import GripLinesVertical from './custom/grip-lines-vertical.svg';
 import Json from './custom/json.svg';
 import PopOut from './custom/pop-out.svg';
@@ -22,6 +23,8 @@ import IconLucideArrowDown from '~icons/lucide/arrow-down';
 import IconLucideArrowLeft from '~icons/lucide/arrow-left';
 import IconLucideArrowLeftRight from '~icons/lucide/arrow-left-right';
 import IconLucideArrowRight from '~icons/lucide/arrow-right';
+import IconLucideArrowRightFromLine from '~icons/lucide/arrow-right-from-line';
+import IconLucideArrowRightToLine from '~icons/lucide/arrow-right-to-line';
 import IconLucideArrowUp from '~icons/lucide/arrow-up';
 import IconLucideAtSign from '~icons/lucide/at-sign';
 import IconLucideBan from '~icons/lucide/ban';
@@ -41,6 +44,7 @@ import IconLucideChevronDown from '~icons/lucide/chevron-down';
 import IconLucideChevronLeft from '~icons/lucide/chevron-left';
 import IconLucideChevronRight from '~icons/lucide/chevron-right';
 import IconLucideChevronUp from '~icons/lucide/chevron-up';
+import IconLucideChevronsDownUp from '~icons/lucide/chevrons-down-up';
 import IconLucideChevronsLeft from '~icons/lucide/chevrons-left';
 import IconLucideChevronsUpDown from '~icons/lucide/chevrons-up-down';
 import IconLucideCircle from '~icons/lucide/circle';
@@ -62,6 +66,7 @@ import IconLucideCode from '~icons/lucide/code';
 import IconLucideCog from '~icons/lucide/cog';
 import IconLucideContrast from '~icons/lucide/contrast';
 import IconLucideCopy from '~icons/lucide/copy';
+import IconLucideCrosshair from '~icons/lucide/crosshair';
 import IconLucideDatabase from '~icons/lucide/database';
 import IconLucideEarth from '~icons/lucide/earth';
 import IconLucideEllipsis from '~icons/lucide/ellipsis';
@@ -124,6 +129,7 @@ import IconLucideMousePointer from '~icons/lucide/mouse-pointer';
 import IconLucideNetwork from '~icons/lucide/network';
 import IconLucidePackageOpen from '~icons/lucide/package-open';
 import IconLucidePalette from '~icons/lucide/palette';
+import IconLucidePanelRight from '~icons/lucide/panel-right';
 import IconLucidePause from '~icons/lucide/pause';
 import IconLucidePen from '~icons/lucide/pen';
 import IconLucidePencil from '~icons/lucide/pencil';
@@ -385,6 +391,8 @@ export const deprecatedIconSet = {
 
 export const updatedIconSet = {
 	// custom icons
+	// NOTE: ensure to replace any colors with "currentColor" in SVG
+	'bolt-filled': BoltFilled,
 	'grip-lines-vertical': GripLinesVertical,
 	variable: IconLucideVariable,
 	'pop-out': PopOut,
@@ -411,6 +419,8 @@ export const updatedIconSet = {
 	'arrow-left': IconLucideArrowLeft,
 	'arrow-left-right': IconLucideArrowLeftRight,
 	'arrow-right': IconLucideArrowRight,
+	'arrow-right-from-line': IconLucideArrowRightFromLine,
+	'arrow-right-to-line': IconLucideArrowRightToLine,
 	'arrow-up': IconLucideArrowUp,
 	'at-sign': IconLucideAtSign,
 	ban: IconLucideBan,
@@ -431,6 +441,8 @@ export const updatedIconSet = {
 	'chevron-right': IconLucideChevronRight,
 	'chevron-up': IconLucideChevronUp,
 	'chevrons-left': IconLucideChevronsLeft,
+	'chevrons-down-up': IconLucideChevronsDownUp,
+	'chevrons-up-down': IconLucideChevronsUpDown,
 	circle: IconLucideCircle,
 	'circle-alert': IconLucideCircleAlert,
 	'circle-check': IconLucideCircleCheck,
@@ -450,6 +462,7 @@ export const updatedIconSet = {
 	cog: IconLucideCog,
 	contrast: IconLucideContrast,
 	copy: IconLucideCopy,
+	crosshair: IconLucideCrosshair,
 	database: IconLucideDatabase,
 	earth: IconLucideEarth,
 	ellipsis: IconLucideEllipsis,
@@ -512,6 +525,7 @@ export const updatedIconSet = {
 	network: IconLucideNetwork,
 	'package-open': IconLucidePackageOpen,
 	palette: IconLucidePalette,
+	'panel-right': IconLucidePanelRight,
 	pause: IconLucidePause,
 	pen: IconLucidePen,
 	pencil: IconLucidePencil,

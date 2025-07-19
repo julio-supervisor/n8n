@@ -1,4 +1,4 @@
-import type { FrontendSettings, ITelemetrySettings } from '@n8n/api-types';
+import type { FrontendSettings, ITelemetrySettings, N8nEnvFeatFlags } from '@n8n/api-types';
 import { LicenseState, Logger, ModuleRegistry } from '@n8n/backend-common';
 import { GlobalConfig, SecurityConfig } from '@n8n/config';
 import { LICENSE_FEATURES } from '@n8n/constants';
@@ -64,6 +64,18 @@ export class FrontendService {
 				this.communityPackagesService = Container.get(CommunityPackagesService);
 			});
 		}
+	}
+
+	private collectEnvFeatureFlags(): N8nEnvFeatFlags {
+		const envFeatureFlags: N8nEnvFeatFlags = {};
+
+		for (const [key, value] of Object.entries(process.env)) {
+			if (key.startsWith('N8N_ENV_FEAT_') && value !== undefined) {
+				envFeatureFlags[key as keyof N8nEnvFeatFlags] = value;
+			}
+		}
+
+		return envFeatureFlags;
 	}
 
 	private initSettings() {
@@ -260,6 +272,7 @@ export class FrontendService {
 				quota: this.licenseState.getMaxWorkflowsWithEvaluations(),
 			},
 			activeModules: this.moduleRegistry.getActiveModules(),
+			envFeatureFlags: this.collectEnvFeatureFlags(),
 		};
 	}
 
@@ -343,20 +356,20 @@ export class FrontendService {
 		if (this.license.isLdapEnabled()) {
 			Object.assign(this.settings.sso.ldap, {
 				loginLabel: getLdapLoginLabel(),
-				loginEnabled: config.getEnv('sso.ldap.loginEnabled'),
+				loginEnabled: this.globalConfig.sso.ldap.loginEnabled,
 			});
 		}
 
 		if (this.license.isSamlEnabled()) {
 			Object.assign(this.settings.sso.saml, {
 				loginLabel: getSamlLoginLabel(),
-				loginEnabled: config.getEnv('sso.saml.loginEnabled'),
+				loginEnabled: this.globalConfig.sso.saml.loginEnabled,
 			});
 		}
 
 		if (this.licenseState.isOidcLicensed()) {
 			Object.assign(this.settings.sso.oidc, {
-				loginEnabled: config.getEnv('sso.oidc.loginEnabled'),
+				loginEnabled: this.globalConfig.sso.oidc.loginEnabled,
 			});
 		}
 
@@ -403,6 +416,9 @@ export class FrontendService {
 
 		// Refresh evaluation settings
 		this.settings.evaluation.quota = this.licenseState.getMaxWorkflowsWithEvaluations();
+
+		// Refresh environment feature flags
+		this.settings.envFeatureFlags = this.collectEnvFeatureFlags();
 
 		return this.settings;
 	}
