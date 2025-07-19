@@ -23,6 +23,24 @@ import {
 	expressionSessionKeyProperty,
 } from '../descriptions';
 
+async function ensureTimestampSetup(pool: pg.Pool, tableName: string) {
+       await pool.query(
+               `ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();`,
+       );
+       await pool.query(`
+               CREATE OR REPLACE FUNCTION add_timestamp_to_message()
+               RETURNS trigger AS $$
+               BEGIN
+                       NEW.message := NEW.message::jsonb || jsonb_build_object('response_metadata', jsonb_build_object('timestamp', NOW()));
+                       NEW.created_at := COALESCE(NEW.created_at, NOW());
+                       RETURN NEW;
+               END;
+               $$ LANGUAGE plpgsql;
+       `);
+       await pool.query(`DROP TRIGGER IF EXISTS update_message_with_timestamp ON ${tableName};`);
+       await pool.query(`CREATE TRIGGER update_message_with_timestamp BEFORE INSERT ON ${tableName} FOR EACH ROW EXECUTE FUNCTION add_timestamp_to_message();`);
+}
+
 export class MemoryPostgresChat implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Postgres Chat Memory',
@@ -91,14 +109,19 @@ export class MemoryPostgresChat implements INodeType {
 		const tableName = this.getNodeParameter('tableName', itemIndex, 'n8n_chat_histories') as string;
 		const sessionId = getSessionId(this, itemIndex);
 
-		const pgConf = await configurePostgres.call(this, credentials);
-		const pool = pgConf.db.$pool as unknown as pg.Pool;
+               const pgConf = await configurePostgres.call(this, credentials);
+               const pool = pgConf.db.$pool as unknown as pg.Pool;
 
-		const pgChatHistory = new PostgresChatMessageHistory({
-			pool,
-			sessionId,
-			tableName,
-		});
+               await ensureTimestampSetup(pool, tableName);
+
+               const pgChatHistory = new PostgresChatMessageHistory({
+                       pool,
+                       sessionId,
+                       tableName,
+               });
+               // Messages stored via this node include a timestamp in
+               // `response_metadata.timestamp` and a `created_at` column
+               // in the database table.
 
 		const memClass = this.getNode().typeVersion < 1.1 ? BufferMemory : BufferWindowMemory;
 		const kOptions =
