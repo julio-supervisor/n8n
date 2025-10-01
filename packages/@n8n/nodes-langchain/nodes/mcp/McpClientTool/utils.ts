@@ -77,35 +77,35 @@ export const getErrorDescriptionFromToolCall = (result: unknown): string | undef
 };
 
 export const createCallTool =
-        (
-                name: string,
-                client: Client,
-				timeout: number,
-                onError: (error: string | undefined) => void,
-                additionalArgs: IDataObject = {},
-        ) =>
-        async (args: IDataObject) => {
-                let result: Awaited<ReturnType<Client['callTool']>>;
+	(
+		name: string,
+		client: Client,
+		timeout: number,
+		onError: (error: string | undefined) => void,
+		additionalArgs: IDataObject = {},
+	) =>
+	async (args: IDataObject) => {
+		let result: Awaited<ReturnType<Client['callTool']>>;
 
-				function handleError(error: unknown) {
-					const errorDescription =
-						getErrorDescriptionFromToolCall(error) ?? `Failed to execute tool "${name}"`;
-					onError(errorDescription);
-					return errorDescription;
-				}
+		function handleError(error: unknown) {
+			const errorDescription =
+				getErrorDescriptionFromToolCall(error) ?? `Failed to execute tool "${name}"`;
+			onError(errorDescription);
+			return errorDescription;
+		}
 
-                try {
-                        const mergedArgs = { ...args, ...additionalArgs };
-                        result = await client.callTool(
-                                { name, arguments: mergedArgs },
-                                CompatibilityCallToolResultSchema,
-								{
-									timeout,
-								}
-                        );
-                } catch (error) {
-                        return handleError(error);
-                }
+		try {
+			const mergedArgs = { ...args, ...additionalArgs };
+			result = await client.callTool(
+				{ name, arguments: mergedArgs },
+				CompatibilityCallToolResultSchema,
+				{
+					timeout,
+				},
+			);
+		} catch (error) {
+			return handleError(error);
+		}
 
 		if (result.isError) {
 			return handleError(result);
