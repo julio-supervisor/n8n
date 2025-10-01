@@ -192,40 +192,40 @@ export class McpClientTool implements INodeType {
 					},
 				},
 			},
-                        {
-                                displayName: 'Tools to Exclude',
-                                name: 'excludeTools',
-                                type: 'multiOptions',
-                                default: [],
+			{
+				displayName: 'Tools to Exclude',
+				name: 'excludeTools',
+				type: 'multiOptions',
+				default: [],
 				description:
 					'Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
 				typeOptions: {
 					loadOptionsMethod: 'getTools',
 				},
-                                displayOptions: {
-                                        show: {
-                                                include: ['except'],
-                                        },
-                                },
+				displayOptions: {
+					show: {
+						include: ['except'],
+					},
+				},
 			},
 			{
-                                displayName: 'Argumentos adicionales',
-                                name: 'additionalArgs',
-                                type: 'fixedCollection',
-                                typeOptions: { multipleValues: true, maxItems: 10 },
-                                default: {},
-                                description: 'Pares clave-valor que se enviarán junto con los argumentos estándar',
-                                options: [
-                                        {
-                                                name: 'arg',
-                                                displayName: 'Argumento',
-                                                values: [
-                                                        { displayName: 'Clave', name: 'key', type: 'string', default: '' },
-                                                        { displayName: 'Valor', name: 'value', type: 'string', default: '' },
-                                                ],
-                                        },
-                                ],
-                        },
+				displayName: 'Argumentos adicionales',
+				name: 'additionalArgs',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, maxItems: 10 },
+				default: {},
+				description: 'Pares clave-valor que se enviarán junto con los argumentos estándar',
+				options: [
+					{
+						name: 'arg',
+						displayName: 'Argumento',
+						values: [
+							{ displayName: 'Clave', name: 'key', type: 'string', default: '' },
+							{ displayName: 'Valor', name: 'value', type: 'string', default: '' },
+						],
+					},
+				],
+			},
 			{
 				displayName: 'Options',
 				name: 'options',
@@ -304,19 +304,18 @@ export class McpClientTool implements INodeType {
 
 		this.logger.debug('McpClientTool: Successfully connected to MCP Server');
 
-                const mode = this.getNodeParameter('include', itemIndex) as McpToolIncludeMode;
-                const includeTools = this.getNodeParameter('includeTools', itemIndex, []) as string[];
-                const excludeTools = this.getNodeParameter('excludeTools', itemIndex, []) as string[];
-                const extraPairs = this.getNodeParameter(
-                        'additionalArgs.arg',
-                        itemIndex,
-                        [],
-                ) as Array<{ key: string; value: string }>;
+		const mode = this.getNodeParameter('include', itemIndex) as McpToolIncludeMode;
+		const includeTools = this.getNodeParameter('includeTools', itemIndex, []) as string[];
+		const excludeTools = this.getNodeParameter('excludeTools', itemIndex, []) as string[];
+		const extraPairs = this.getNodeParameter('additionalArgs.arg', itemIndex, []) as Array<{
+			key: string;
+			value: string;
+		}>;
 
-                const additionalArgs = extraPairs.reduce<IDataObject>((acc, { key, value }) => {
-                        if (key) acc[key] = value;
-                        return acc;
-                }, {});
+		const additionalArgs = extraPairs.reduce<IDataObject>((acc, { key, value }) => {
+			if (key) acc[key] = value;
+			return acc;
+		}, {});
 
 		const allTools = await getAllTools(client.result);
 		const mcpTools = getSelectedTools({
@@ -337,11 +336,17 @@ export class McpClientTool implements INodeType {
 			logWrapper(
 				mcpToolToDynamicTool(
 					tool,
-					createCallTool(tool.name, client.result, timeout, (errorMessage) => {
-						const error = new NodeOperationError(node, errorMessage, { itemIndex });
-						void this.addOutputData(NodeConnectionTypes.AiTool, itemIndex, error);
-						this.logger.error(`McpClientTool: Tool "${tool.name}" failed to execute`, { error });
-					}, additionalArgs),
+					createCallTool(
+						tool.name,
+						client.result,
+						timeout,
+						(errorMessage) => {
+							const error = new NodeOperationError(node, errorMessage, { itemIndex });
+							void this.addOutputData(NodeConnectionTypes.AiTool, itemIndex, error);
+							this.logger.error(`McpClientTool: Tool "${tool.name}" failed to execute`, { error });
+						},
+						additionalArgs,
+					),
 				),
 				this,
 			),
