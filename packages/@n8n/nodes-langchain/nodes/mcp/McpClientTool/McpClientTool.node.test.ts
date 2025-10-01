@@ -1,8 +1,10 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CompatibilityCallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { mock } from 'jest-mock-extended';
 import {
+	NodeConnectionTypes,
 	NodeOperationError,
 	type ILoadOptionsFunctions,
 	type INode,
@@ -237,17 +239,17 @@ describe('McpClientTool', () => {
 			});
 		});
 
-                it('should support bearer auth', async () => {
-                        jest.spyOn(Client.prototype, 'connect').mockResolvedValue();
-                        jest.spyOn(Client.prototype, 'listTools').mockResolvedValue({
-                                tools: [
-                                        {
-                                                name: 'MyTool1',
-                                                description: 'MyTool1 does something',
-                                                inputSchema: { type: 'object', properties: { input: { type: 'string' } } },
-                                        },
-                                ],
-                        });
+		it('should support bearer auth', async () => {
+			jest.spyOn(Client.prototype, 'connect').mockResolvedValue();
+			jest.spyOn(Client.prototype, 'listTools').mockResolvedValue({
+				tools: [
+					{
+						name: 'MyTool1',
+						description: 'MyTool1 does something',
+						inputSchema: { type: 'object', properties: { input: { type: 'string' } } },
+					},
+				],
+			});
 
 			const supplyDataResult = await new McpClientTool().supplyData.call(
 				mock<ISupplyDataFunctions>({
@@ -280,49 +282,167 @@ describe('McpClientTool', () => {
 			});
 
 			const customFetch = jest.mocked(SSEClientTransport).mock.calls[0][1]?.eventSourceInit?.fetch;
-                        await customFetch?.(url);
-                        expect(fetchSpy).toHaveBeenCalledWith(url, {
-                                headers: { Accept: 'text/event-stream', Authorization: 'Bearer my-token' },
-                        });
-                });
+			await customFetch?.(url);
+			expect(fetchSpy).toHaveBeenCalledWith(url, {
+				headers: { Accept: 'text/event-stream', Authorization: 'Bearer my-token' },
+			});
+		});
 
-                it('should merge additional arguments with runtime arguments', async () => {
-                        jest.spyOn(Client.prototype, 'connect').mockResolvedValue();
-                        const callSpy = jest
-                                .spyOn(Client.prototype, 'callTool')
-                                .mockResolvedValue({ content: [{ type: 'text', text: 'result' }] });
-                        jest.spyOn(Client.prototype, 'listTools').mockResolvedValue({
-                                tools: [
-                                        {
-                                                name: 'MyTool1',
-                                                description: 'MyTool1 does something',
-                                                inputSchema: { type: 'object', properties: {} },
-                                        },
-                                ],
-                        });
+		it('should merge additional arguments with runtime arguments', async () => {
+			jest.spyOn(Client.prototype, 'connect').mockResolvedValue();
+			const callSpy = jest
+				.spyOn(Client.prototype, 'callTool')
+				.mockResolvedValue({ content: [{ type: 'text', text: 'result' }] });
+			jest.spyOn(Client.prototype, 'listTools').mockResolvedValue({
+				tools: [
+					{
+						name: 'MyTool1',
+						description: 'MyTool1 does something',
+						inputSchema: { type: 'object', properties: {} },
+					},
+				],
+			});
 
-                        const supplyDataResult = await new McpClientTool().supplyData.call(
-                                mock<ISupplyDataFunctions>({
-                                        getNode: jest.fn(() => mock<INode>({ typeVersion: 1 })),
-                                        getNodeParameter: jest.fn((key) => {
-                                                const parameters: Record<string, any> = {
-                                                        'additionalArgs.arg': [{ key: 'tenant', value: 'foo' }],
-                                                };
-                                                return parameters[key];
-                                        }),
-                                        logger: { debug: jest.fn(), error: jest.fn() },
-                                        addInputData: jest.fn(() => ({ index: 0 })),
-                                }),
-                                0,
-                        );
+			const supplyDataResult = await new McpClientTool().supplyData.call(
+				mock<ISupplyDataFunctions>({
+					getNode: jest.fn(() => mock<INode>({ typeVersion: 1 })),
+					getNodeParameter: jest.fn((key) => {
+						const parameters: Record<string, any> = {
+							'additionalArgs.arg': [{ key: 'tenant', value: 'foo' }],
+						};
+						return parameters[key];
+					}),
+					logger: { debug: jest.fn(), error: jest.fn() },
+					addInputData: jest.fn(() => ({ index: 0 })),
+				}),
+				0,
+			);
 
-                        const tools = (supplyDataResult.response as McpToolkit).getTools();
-                        await tools[0].invoke({ input: 'bar' });
+			const tools = (supplyDataResult.response as McpToolkit).getTools();
+			await tools[0].invoke({ input: 'bar' });
 
-                        expect(callSpy).toHaveBeenCalledWith(
-                                { name: 'MyTool1', arguments: { input: 'bar', tenant: 'foo' } },
-                                CompatibilityCallToolResultSchema,
-                        );
-                });
-        });
+			expect(callSpy).toHaveBeenCalledWith(
+				{ name: 'MyTool1', arguments: { input: 'bar', tenant: 'foo' } },
+				CompatibilityCallToolResultSchema,
+			);
+		});
+
+		it('should successfully execute a tool', async () => {
+			jest.spyOn(Client.prototype, 'connect').mockResolvedValue();
+			jest.spyOn(Client.prototype, 'callTool').mockResolvedValue({ content: 'Sunny' });
+			jest.spyOn(Client.prototype, 'listTools').mockResolvedValue({
+				tools: [
+					{
+						name: 'Weather Tool',
+						description: 'Gets the current weather',
+						inputSchema: { type: 'object', properties: { location: { type: 'string' } } },
+					},
+				],
+			});
+
+			const supplyDataResult = await new McpClientTool().supplyData.call(
+				mock<ISupplyDataFunctions>({
+					getNode: jest.fn(() =>
+						mock<INode>({
+							typeVersion: 1,
+						}),
+					),
+					logger: { debug: jest.fn(), error: jest.fn() },
+					addInputData: jest.fn(() => ({ index: 0 })),
+				}),
+				0,
+			);
+
+			expect(supplyDataResult.closeFunction).toBeInstanceOf(Function);
+			expect(supplyDataResult.response).toBeInstanceOf(McpToolkit);
+
+			const tools = (supplyDataResult.response as McpToolkit).getTools();
+			const toolResult = await tools[0].invoke({ location: 'Berlin' });
+			expect(toolResult).toEqual('Sunny');
+		});
+
+		it('should handle tool errors', async () => {
+			jest.spyOn(Client.prototype, 'connect').mockResolvedValue();
+			jest
+				.spyOn(Client.prototype, 'callTool')
+				.mockResolvedValue({ isError: true, content: [{ text: 'Weather unknown at location' }] });
+			jest.spyOn(Client.prototype, 'listTools').mockResolvedValue({
+				tools: [
+					{
+						name: 'Weather Tool',
+						description: 'Gets the current weather',
+						inputSchema: { type: 'object', properties: { location: { type: 'string' } } },
+					},
+				],
+			});
+
+			const supplyDataFunctions = mock<ISupplyDataFunctions>({
+				getNode: jest.fn(() =>
+					mock<INode>({
+						typeVersion: 1,
+					}),
+				),
+				logger: { debug: jest.fn(), error: jest.fn() },
+				addInputData: jest.fn(() => ({ index: 0 })),
+			});
+			const supplyDataResult = await new McpClientTool().supplyData.call(supplyDataFunctions, 0);
+
+			expect(supplyDataResult.closeFunction).toBeInstanceOf(Function);
+			expect(supplyDataResult.response).toBeInstanceOf(McpToolkit);
+
+			const tools = (supplyDataResult.response as McpToolkit).getTools();
+			const toolResult = await tools[0].invoke({ location: 'Berlin' });
+			expect(toolResult).toEqual('Weather unknown at location');
+			expect(supplyDataFunctions.addOutputData).toHaveBeenCalledWith(
+				NodeConnectionTypes.AiTool,
+				0,
+				new NodeOperationError(supplyDataFunctions.getNode(), 'Weather unknown at location'),
+			);
+		});
+
+		it('should support setting a timeout', async () => {
+			jest.spyOn(Client.prototype, 'connect').mockResolvedValue();
+			const callToolSpy = jest
+				.spyOn(Client.prototype, 'callTool')
+				.mockRejectedValue(
+					new McpError(ErrorCode.RequestTimeout, 'Request timed out', { timeout: 200 }),
+				);
+			jest.spyOn(Client.prototype, 'listTools').mockResolvedValue({
+				tools: [
+					{
+						name: 'SlowTool',
+						description: 'SlowTool throws a timeout',
+						inputSchema: { type: 'object', properties: { input: { type: 'string' } } },
+					},
+				],
+			});
+
+			const mockNode = mock<INode>({ typeVersion: 1 });
+			const supplyDataResult = await new McpClientTool().supplyData.call(
+				mock<ISupplyDataFunctions>({
+					getNode: jest.fn(() => mockNode),
+					getNodeParameter: jest.fn((key, _index) => {
+						const parameters: Record<string, any> = {
+							'options.timeout': 200,
+						};
+						return parameters[key];
+					}),
+					logger: { debug: jest.fn(), error: jest.fn() },
+					addInputData: jest.fn(() => ({ index: 0 })),
+				}),
+				0,
+			);
+
+			const tools = (supplyDataResult.response as McpToolkit).getTools();
+
+			await expect(tools[0].invoke({ input: 'foo' })).resolves.toEqual(
+				'MCP error -32001: Request timed out',
+			);
+			expect(callToolSpy).toHaveBeenCalledWith(
+				expect.any(Object), // params
+				expect.any(Object), // schema
+				expect.objectContaining({ timeout: 200 }),
+			); // options
+		});
+	});
 });

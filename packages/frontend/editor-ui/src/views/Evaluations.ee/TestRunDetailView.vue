@@ -9,18 +9,56 @@ import type { BaseTextKey } from '@n8n/i18n';
 import { useEvaluationStore } from '@/stores/evaluation.store.ee';
 import { useWorkflowsStore } from '@/stores/workflows.store';
 import { convertToDisplayDate } from '@/utils/formatters/dateFormatter';
-import { N8nText, N8nTooltip, N8nIcon } from '@n8n/design-system';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import orderBy from 'lodash/orderBy';
 import { statusDictionary } from '@/components/Evaluations.ee/shared/statusDictionary';
 import { getErrorBaseKey } from '@/components/Evaluations.ee/shared/errorCodes';
+import { ElScrollbar } from 'element-plus';
+import {
+	N8nCallout,
+	N8nExternalLink,
+	N8nHeading,
+	N8nIcon,
+	N8nIconButton,
+	N8nLoading,
+	N8nTableHeaderControlsButton,
+	N8nText,
+	N8nTooltip,
+} from '@n8n/design-system';
+import {
+	applyCachedSortOrder,
+	applyCachedVisibility,
+	getDefaultOrderedColumns,
+	getTestCasesColumns,
+	getTestTableHeaders,
+} from './utils';
+import {
+	useWorkflowSettingsCache,
+	type UserEvaluationPreferences,
+} from '@/composables/useWorkflowsCache';
+
+export type Column =
+	| {
+			key: string;
+			label: string;
+			visible: boolean;
+			numeric?: boolean;
+			disabled: false;
+			columnType: 'inputs' | 'outputs' | 'metrics';
+	  }
+	// Disabled state ensures current sort order is not lost if user resorts teh columns
+	// even if some columns are disabled / not available in the current run
+	| { key: string; disabled: true };
+
+export type Header = TestTableColumn<TestCaseExecutionRecord & { index: number }>;
 
 const router = useRouter();
 const toast = useToast();
 const evaluationStore = useEvaluationStore();
 const workflowsStore = useWorkflowsStore();
 const locale = useI18n();
+const workflowsCache = useWorkflowSettingsCache();
 
 const isLoading = ref(true);
 const testCases = ref<TestCaseExecutionRecord[]>([]);
@@ -29,6 +67,9 @@ const hasFailedTestCases = ref<boolean>(false);
 const runId = computed(() => router.currentRoute.value.params.runId as string);
 const workflowId = computed(() => router.currentRoute.value.params.name as string);
 const workflowName = computed(() => workflowsStore.getWorkflowById(workflowId.value)?.name ?? '');
+
+const cachedUserPreferences = ref<UserEvaluationPreferences | undefined>();
+const expandedRows = ref<Set<string>>(new Set());
 
 const run = computed(() => evaluationStore.testRunsById[runId.value]);
 const runErrorDetails = computed(() => {
@@ -41,6 +82,8 @@ const filteredTestCases = computed(() =>
 	),
 );
 
+const isAllExpanded = computed(() => expandedRows.value.size === filteredTestCases.value.length);
+
 const testRunIndex = computed(() =>
 	Object.values(
 		orderBy(evaluationStore.testRunsById, (record) => new Date(record.runAt), ['asc']).filter(
@@ -51,7 +94,7 @@ const testRunIndex = computed(() =>
 
 const formattedTime = computed(() => convertToDisplayDate(new Date(run.value?.runAt).getTime()));
 
-const handleRowClick = (row: TestCaseExecutionRecord) => {
+const openRelatedExecution = (row: TestCaseExecutionRecord) => {
 	const executionId = row.executionId;
 	if (executionId) {
 		const { href } = router.resolve({
@@ -65,29 +108,29 @@ const handleRowClick = (row: TestCaseExecutionRecord) => {
 	}
 };
 
-const columns = computed(
-	(): Array<TestTableColumn<TestCaseExecutionRecord & { index: number }>> => [
-		{
-			prop: 'index',
-			width: 100,
-			label: locale.baseText('evaluation.runDetail.testCase'),
-			sortable: true,
-			formatter: (row: TestCaseExecutionRecord & { index: number }) => `#${row.index}`,
-		},
-		{
-			prop: 'status',
-			label: locale.baseText('evaluation.listRuns.status'),
-		},
-		...Object.keys(run.value?.metrics ?? {}).map((metric) => ({
-			prop: `metrics.${metric}`,
-			label: metric,
-			sortable: true,
-			filter: true,
-			showHeaderTooltip: true,
-			formatter: (row: TestCaseExecutionRecord) => row.metrics?.[metric]?.toFixed(2) ?? '-',
-		})),
-	],
-);
+const inputColumns = computed(() => getTestCasesColumns(filteredTestCases.value, 'inputs'));
+
+const orderedColumns = computed((): Column[] => {
+	const defaultOrder = getDefaultOrderedColumns(run.value, filteredTestCases.value);
+	const appliedCachedOrder = applyCachedSortOrder(defaultOrder, cachedUserPreferences.value?.order);
+
+	return applyCachedVisibility(appliedCachedOrder, cachedUserPreferences.value?.visibility);
+});
+
+const columns = computed((): Header[] => [
+	{
+		prop: 'index',
+		width: 100,
+		label: locale.baseText('evaluation.runDetail.testCase'),
+		sortable: true,
+	} satisfies Header,
+	{
+		prop: 'status',
+		label: locale.baseText('evaluation.listRuns.status'),
+		minWidth: 125,
+	} satisfies Header,
+	...getTestTableHeaders(orderedColumns.value, filteredTestCases.value),
+]);
 
 const metrics = computed(() => run.value?.metrics ?? {});
 
@@ -117,8 +160,49 @@ const fetchExecutionTestCases = async () => {
 	}
 };
 
+async function loadCachedUserPreferences() {
+	cachedUserPreferences.value = await workflowsCache.getEvaluationPreferences(workflowId.value);
+}
+
+async function saveCachedUserPreferences() {
+	if (cachedUserPreferences.value) {
+		await workflowsCache.saveEvaluationPreferences(workflowId.value, cachedUserPreferences.value);
+	}
+}
+
+async function handleColumnVisibilityUpdate(columnKey: string, visibility: boolean) {
+	cachedUserPreferences.value ??= { order: [], visibility: {} };
+	cachedUserPreferences.value.visibility[columnKey] = visibility;
+	await saveCachedUserPreferences();
+}
+
+async function handleColumnOrderUpdate(newOrder: string[]) {
+	cachedUserPreferences.value ??= { order: [], visibility: {} };
+	cachedUserPreferences.value.order = newOrder;
+	await saveCachedUserPreferences();
+}
+
+function toggleRowExpansion(row: { id: string }) {
+	if (expandedRows.value.has(row.id)) {
+		expandedRows.value.delete(row.id);
+	} else {
+		expandedRows.value.add(row.id);
+	}
+}
+
+function toggleAllExpansion() {
+	if (isAllExpanded.value) {
+		// Collapse all
+		expandedRows.value.clear();
+	} else {
+		// Expand all
+		expandedRows.value = new Set(filteredTestCases.value.map((row) => row.id));
+	}
+}
+
 onMounted(async () => {
 	await fetchExecutionTestCases();
+	await loadCachedUserPreferences();
 });
 </script>
 
@@ -127,16 +211,16 @@ onMounted(async () => {
 		<div :class="$style.header">
 			<button :class="$style.backButton" @click="router.back()">
 				<N8nIcon icon="arrow-left" />
-				<n8n-heading size="large" :bold="true">{{
+				<N8nHeading size="large" :bold="true">{{
 					locale.baseText('evaluation.listRuns.runListHeader', {
 						interpolate: {
 							name: workflowName,
 						},
 					})
-				}}</n8n-heading>
+				}}</N8nHeading>
 			</button>
 			<span :class="$style.headerSeparator">/</span>
-			<n8n-heading size="large" :bold="true">
+			<N8nHeading size="large" :bold="true">
 				{{
 					locale.baseText('evaluation.listRuns.testCasesListHeader', {
 						interpolate: {
@@ -144,9 +228,9 @@ onMounted(async () => {
 						},
 					})
 				}}
-			</n8n-heading>
+			</N8nHeading>
 		</div>
-		<n8n-callout v-if="run?.status === 'error'" theme="danger" icon="triangle-alert" class="mb-s">
+		<N8nCallout v-if="run?.status === 'error'" theme="danger" icon="triangle-alert" class="mb-s">
 			<N8nText size="small" :class="$style.capitalized">
 				{{
 					locale.baseText(
@@ -155,8 +239,9 @@ onMounted(async () => {
 					) ?? locale.baseText(`${getErrorBaseKey('UNKNOWN_ERROR')}` as BaseTextKey)
 				}}
 			</N8nText>
-		</n8n-callout>
-		<el-scrollbar always :class="$style.scrollableSummary" class="mb-m">
+		</N8nCallout>
+
+		<ElScrollbar always :class="$style.scrollableSummary" class="mb-m">
 			<div style="display: flex">
 				<div :class="$style.summaryCard">
 					<N8nText size="small" :class="$style.summaryCardTitle">
@@ -214,9 +299,55 @@ onMounted(async () => {
 					}}</N8nText>
 				</div>
 			</div>
-		</el-scrollbar>
+		</ElScrollbar>
+
+		<div :class="['mb-s', $style.runsHeader]">
+			<div>
+				<N8nHeading size="large" :bold="true"
+					>{{
+						locale.baseText('evaluation.listRuns.allTestCases', {
+							interpolate: {
+								count: filteredTestCases.length,
+							},
+						})
+					}}
+				</N8nHeading>
+			</div>
+			<div :class="$style.runsHeaderButtons">
+				<N8nIconButton
+					:icon="isAllExpanded ? 'chevrons-down-up' : 'chevrons-up-down'"
+					type="secondary"
+					size="medium"
+					@click="toggleAllExpansion"
+				/>
+				<N8nTableHeaderControlsButton
+					size="medium"
+					icon-size="small"
+					:columns="orderedColumns"
+					@update:column-visibility="handleColumnVisibilityUpdate"
+					@update:column-order="handleColumnOrderUpdate"
+				/>
+			</div>
+		</div>
+
+		<N8nCallout
+			v-if="
+				!isLoading &&
+				!inputColumns.length &&
+				run?.status === 'completed' &&
+				run?.finalResult === 'success'
+			"
+			theme="secondary"
+			icon="info"
+			class="mb-s"
+		>
+			<N8nText size="small" :class="$style.capitalized">
+				{{ locale.baseText('evaluation.runDetail.notice.useSetInputs') }}
+			</N8nText>
+		</N8nCallout>
+
 		<div v-if="isLoading" :class="$style.loading">
-			<n8n-loading :loading="true" :rows="5" />
+			<N8nLoading :loading="true" :rows="5" />
 		</div>
 
 		<TestTableBase
@@ -224,11 +355,24 @@ onMounted(async () => {
 			:data="filteredTestCases"
 			:columns="columns"
 			:default-sort="{ prop: 'id', order: 'descending' }"
-			@row-click="handleRowClick"
+			:expanded-rows="expandedRows"
+			@row-click="toggleRowExpansion"
 		>
 			<template #id="{ row }">
 				<div style="display: flex; justify-content: space-between; gap: 10px">
 					{{ row.id }}
+				</div>
+			</template>
+			<template #index="{ row }">
+				<div>
+					<N8nExternalLink
+						v-if="row.executionId"
+						class="open-execution-link"
+						@click.stop.prevent="openRelatedExecution(row)"
+					>
+						#{{ row.index }}
+					</N8nExternalLink>
+					<span v-else :class="$style.deletedExecutionRowIndex">#{{ row.index }}</span>
 				</div>
 			</template>
 			<template #status="{ row }">
@@ -262,13 +406,21 @@ onMounted(async () => {
 	</div>
 </template>
 
+<style lang="scss" scoped>
+/**
+	When hovering over link in row, ensure hover background is removed from row
+ */
+:global(tr:hover:has(.open-execution-link:hover)) {
+	--color-table-row-hover-background: transparent;
+}
+</style>
+
 <style module lang="scss">
 .container {
 	height: 100%;
 	width: 100%;
 	max-width: var(--content-container-width);
-	margin: auto;
-	padding: var(--spacing-l) var(--spacing-2xl) 0;
+	padding: var(--spacing-l) 0;
 }
 
 .header {
@@ -325,6 +477,19 @@ onMounted(async () => {
 
 .downloadButton {
 	margin-bottom: var(--spacing-s);
+}
+
+.runsHeader {
+	display: flex;
+
+	> div:first-child {
+		flex: 1;
+	}
+}
+
+.runsHeaderButtons {
+	display: flex;
+	gap: var(--spacing-xs);
 }
 
 .loading {
@@ -404,5 +569,10 @@ onMounted(async () => {
 	color: var(--color-text-danger);
 	font-size: var(--font-size-2xs);
 	line-height: 1.25;
+}
+
+.deletedExecutionRowIndex {
+	color: var(--color-text-base);
+	font-weight: var(--font-weight-regular);
 }
 </style>

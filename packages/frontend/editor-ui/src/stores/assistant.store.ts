@@ -30,6 +30,7 @@ import { useUIStore } from './ui.store';
 import AiUpdatedCodeMessage from '@/components/AiUpdatedCodeMessage.vue';
 import { useCredentialsStore } from './credentials.store';
 import { useAIAssistantHelpers } from '@/composables/useAIAssistantHelpers';
+import { useBuilderStore } from './builder.store';
 
 export const MAX_CHAT_WIDTH = 425;
 export const MIN_CHAT_WIDTH = 300;
@@ -62,6 +63,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 	const locale = useI18n();
 	const telemetry = useTelemetry();
 	const assistantHelpers = useAIAssistantHelpers();
+	const builderStore = useBuilderStore();
 
 	const suggestions = ref<{
 		[suggestionId: string]: {
@@ -114,9 +116,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 		() => isAssistantEnabled.value && EDITABLE_CANVAS_VIEWS.includes(route.name as VIEWS),
 	);
 	const hideAssistantFloatingButton = computed(
-		() =>
-			(route.name === VIEWS.WORKFLOW || route.name === VIEWS.NEW_WORKFLOW) &&
-			!workflowsStore.activeNode(),
+		() => EDITABLE_CANVAS_VIEWS.includes(route.name as VIEWS) && !workflowsStore.activeNode(),
 	);
 
 	const unreadCount = computed(
@@ -124,6 +124,13 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 			chatMessages.value.filter(
 				(msg) => READABLE_TYPES.includes(msg.type) && msg.role === 'assistant' && !msg.read,
 			).length,
+	);
+
+	const isFloatingButtonShown = computed(
+		() =>
+			canShowAssistantButtonsOnCanvas.value &&
+			!isAssistantOpen.value &&
+			!hideAssistantFloatingButton.value,
 	);
 
 	function resetAssistantChat() {
@@ -170,6 +177,11 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 		if (chatWindowOpen.value) {
 			closeChat();
 		} else {
+			if (builderStore.isAIBuilderEnabled) {
+				// If builder is enabled, open it instead of assistant
+				void builderStore.openChat();
+				return;
+			}
 			openChat();
 		}
 	}
@@ -180,7 +192,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 			(msg) => !(msg.id === id && msg.role === 'assistant'),
 		);
 		assistantThinkingMessage.value = undefined;
-		newMessages.forEach((msg) => {
+		(newMessages ?? []).forEach((msg) => {
 			if (msg.type === 'message') {
 				messages.push({
 					id,
@@ -721,8 +733,8 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 			codeDiffMessage.replacing = true;
 			const suggestionId = codeDiffMessage.suggestionId;
 
-			const currentWorkflow = workflowsStore.getCurrentWorkflow();
-			const activeNode = currentWorkflow.getNode(chatSessionError.value.node.name);
+			const workflowObject = workflowsStore.workflowObject;
+			const activeNode = workflowObject.getNode(chatSessionError.value.node.name);
 			assert(activeNode);
 
 			const cached = suggestions.value[suggestionId];
@@ -767,8 +779,8 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 			const suggestion = suggestions.value[suggestionId];
 			assert(suggestion);
 
-			const currentWorkflow = workflowsStore.getCurrentWorkflow();
-			const activeNode = currentWorkflow.getNode(chatSessionError.value.node.name);
+			const workflowObject = workflowsStore.workflowObject;
+			const activeNode = workflowObject.getNode(chatSessionError.value.node.name);
 			assert(activeNode);
 
 			const suggested = suggestion.previous;
@@ -837,6 +849,7 @@ export const useAssistantStore = defineStore(STORES.ASSISTANT, () => {
 		currentSessionId,
 		lastUnread,
 		isSessionEnded,
+		isFloatingButtonShown,
 		onNodeExecution,
 		trackUserOpenedAssistant,
 		closeChat,
