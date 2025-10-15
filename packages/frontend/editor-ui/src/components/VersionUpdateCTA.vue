@@ -72,13 +72,12 @@ const onUpdateClick = async () => {
 	display: flex;
 	flex-direction: column;
 	justify-content: space-between;
-	gap: var(--spacing-2xs);
-	padding: var(--spacing-2xs) var(--spacing-xs);
-	margin-left: var(--spacing-s);
-	margin-bottom: var(--spacing-3xs);
-	border-radius: var(--border-radius-base);
-	border: var(--border-base);
-	background: var(--color-background-light-base);
+	gap: var(--spacing--2xs);
+	padding: var(--spacing--2xs) var(--spacing--xs);
+	border-radius: var(--radius);
+	border: var(--border);
+	background: var(--color--background--light-1);
+	margin-top: var(--spacing--xs);
 }
 
 .button {
