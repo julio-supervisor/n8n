@@ -77,7 +77,13 @@ export const getErrorDescriptionFromToolCall = (result: unknown): string | undef
 };
 
 export const createCallTool =
-	(name: string, client: Client, timeout: number, onError: (error: string) => void) =>
+	(
+		name: string,
+		client: Client,
+		timeout: number,
+		onError: (error: string | undefined) => void,
+		additionalArgs: IDataObject = {},
+	) =>
 	async (args: IDataObject) => {
 		let result: Awaited<ReturnType<Client['callTool']>>;
 
@@ -89,9 +95,14 @@ export const createCallTool =
 		}
 
 		try {
-			result = await client.callTool({ name, arguments: args }, CompatibilityCallToolResultSchema, {
-				timeout,
-			});
+			const mergedArgs = { ...args, ...additionalArgs };
+			result = await client.callTool(
+				{ name, arguments: mergedArgs },
+				CompatibilityCallToolResultSchema,
+				{
+					timeout,
+				},
+			);
 		} catch (error) {
 			return handleError(error);
 		}

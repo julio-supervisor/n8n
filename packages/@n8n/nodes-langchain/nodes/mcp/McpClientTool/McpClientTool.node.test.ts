@@ -1,5 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { CompatibilityCallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { mock } from 'jest-mock-extended';
 import {
@@ -285,6 +286,45 @@ describe('McpClientTool', () => {
 			expect(fetchSpy).toHaveBeenCalledWith(url, {
 				headers: { Accept: 'text/event-stream', Authorization: 'Bearer my-token' },
 			});
+		});
+
+		it('should merge additional arguments with runtime arguments', async () => {
+			jest.spyOn(Client.prototype, 'connect').mockResolvedValue();
+			const callSpy = jest
+				.spyOn(Client.prototype, 'callTool')
+				.mockResolvedValue({ content: [{ type: 'text', text: 'result' }] });
+			jest.spyOn(Client.prototype, 'listTools').mockResolvedValue({
+				tools: [
+					{
+						name: 'MyTool1',
+						description: 'MyTool1 does something',
+						inputSchema: { type: 'object', properties: {} },
+					},
+				],
+			});
+
+			const supplyDataResult = await new McpClientTool().supplyData.call(
+				mock<ISupplyDataFunctions>({
+					getNode: jest.fn(() => mock<INode>({ typeVersion: 1 })),
+					getNodeParameter: jest.fn((key) => {
+						const parameters: Record<string, any> = {
+							'additionalArgs.arg': [{ key: 'tenant', value: 'foo' }],
+						};
+						return parameters[key];
+					}),
+					logger: { debug: jest.fn(), error: jest.fn() },
+					addInputData: jest.fn(() => ({ index: 0 })),
+				}),
+				0,
+			);
+
+			const tools = (supplyDataResult.response as McpToolkit).getTools();
+			await tools[0].invoke({ input: 'bar' });
+
+			expect(callSpy).toHaveBeenCalledWith(
+				{ name: 'MyTool1', arguments: { input: 'bar', tenant: 'foo' } },
+				CompatibilityCallToolResultSchema,
+			);
 		});
 
 		it('should successfully execute a tool', async () => {
